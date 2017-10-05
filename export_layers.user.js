@@ -2,10 +2,10 @@
 // @id             iitc-plugin-export-layers@Jormund
 // @name           IITC plugin: export layers 
 // @category       Layer
-// @version        0.1.0.201701005.1609
+// @version        0.1.0.201701005.1619
 // @namespace      https://github.com/jonatkins/ingress-intel-total-conversion
-// @downloadURL    https://raw.githubusercontent.com/Jormund/extract_log/master/export_layers.user.js
-// @description    [2017-10-05-1609] Export layers from Layer chooser
+// @downloadURL    https://raw.githubusercontent.com/Jormund/export_layers/master/export_layers.user.js
+// @description    [2017-10-05-1619] Export layers from Layer chooser
 // @include        https://www.ingress.com/intel*
 // @include        http://www.ingress.com/intel*
 // @match          https://www.ingress.com/intel*
