@@ -2,11 +2,11 @@
 // @id             iitc-plugin-export-layers@Jormund
 // @name           IITC plugin: export layers 
 // @category       Layer
-// @version        0.1.2.20171010.2202
+// @version        0.1.3.20171013.1850
 // @namespace      https://github.com/jonatkins/ingress-intel-total-conversion
 // @updateURL      https://raw.githubusercontent.com/Jormund/export_layers/master/export_layers.meta.js
 // @downloadURL    https://raw.githubusercontent.com/Jormund/export_layers/master/export_layers.user.js
-// @description    [2017-10-10-2202] Export layers from Layer chooser
+// @description    [2017-10-13-1850] Export layers from Layer chooser
 // @include        https://ingress.com/intel*
 // @include        http://ingress.com/intel*
 // @include        https://*.ingress.com/intel*
@@ -119,7 +119,10 @@ function wrapper(plugin_info) {
 					item.color = layer.options.icon.options.color;
 			} else {
 				item = null;
-				window.plugin.exportLayers.log('Unknown layer type when exporting to draw tools layer'+JSON.stringify(layer.toGeoJSON()));
+				window.plugin.exportLayers.log('Unknown layer type when exporting to draw tools layer');
+				if(layer.toGeoJSON){
+					window.plugin.exportLayers.log(JSON.stringify(layer.toGeoJSON()));
+				}
 			}
 			
 			if(item != null)
@@ -128,6 +131,8 @@ function wrapper(plugin_info) {
 		
 		return result;
 	}
+	
+	//window.plugin.exportLayers.getLayerList = function
 	
 	window.plugin.exportLayers.getLayerByName = function(layerName){
 		var foundLayer = null;
@@ -233,8 +238,10 @@ function wrapper(plugin_info) {
         				'</td>' +
         				'<td>' +
                             '<select id="exportLayers-exportedLayerName">';
-        for (layerId in window.layerChooser._layers) {
-            var layer = window.layerChooser._layers[layerId];
+		var allLayers = window.layerChooser.getLayers();
+		var layerArray = allLayers.overlayLayers;//window.layerChooser._layers without map layers
+        for (layerIndex in layerArray) {
+            var layer = layerArray[layerIndex];
             html += '<option value="' + layer.name + '" ' +
                                     (window.plugin.exportLayers.storage.exportedLayerName == layer.name ? 'selected="selected" ' : '') +
                                     '>' + layer.name + '</option>';
