@@ -1,12 +1,12 @@
-// ==UserScript==
+﻿// ==UserScript==
 // @id             iitc-plugin-export-layers@Jormund
 // @name           IITC plugin: export layers 
 // @category       Layer
-// @version        0.1.3.20171013.1850
+// @version        0.1.4.20171030.1633
 // @namespace      https://github.com/jonatkins/ingress-intel-total-conversion
 // @updateURL      https://raw.githubusercontent.com/Jormund/export_layers/master/export_layers.meta.js
 // @downloadURL    https://raw.githubusercontent.com/Jormund/export_layers/master/export_layers.user.js
-// @description    [2017-10-13-1850] Export layers from Layer chooser
+// @description    [2017-10-30-1633] Export layers from Layer chooser or search result
 // @include        https://ingress.com/intel*
 // @include        http://ingress.com/intel*
 // @include        https://*.ingress.com/intel*
@@ -28,18 +28,18 @@ function wrapper(plugin_info) {
 
     window.plugin.exportLayers.KEY_STORAGE = 'exportLayers-storage';
 
-	window.plugin.exportLayers.EXPORT_TYPE = { GEOGSON: {code:'GEOGSON',name:'GeoJSON'},
-                                            DRAWTOOLS: {code:'DRAWTOOLS',name:'Draw tools'}/*,
+    window.plugin.exportLayers.EXPORT_TYPE = { GEOGSON: { code: 'GEOGSON', name: 'GeoJSON' },
+        DRAWTOOLS: { code: 'DRAWTOOLS', name: 'Draw tools'}/*,
                                             BOOKMARKS: {code:'BOOKMARKS',name:'Bookmarks (not implemented)'}*/
-                                            };
-											
+    };
+
     window.plugin.exportLayers.DEFAULT_LAYER_NAME = '';
-	window.plugin.exportLayers.DEFAULT_EXPORT_TYPE = window.plugin.exportLayers.EXPORT_TYPE.GEOGSON;
+    window.plugin.exportLayers.DEFAULT_EXPORT_TYPE = window.plugin.exportLayers.EXPORT_TYPE.GEOGSON;
 
 
     window.plugin.exportLayers.storage = {
         exportedLayerName: window.plugin.exportLayers.DEFAULT_LAYER_NAME,
-		exportType: window.plugin.exportLayers.DEFAULT_EXPORT_TYPE
+        exportType: window.plugin.exportLayers.DEFAULT_EXPORT_TYPE
     };
 
     window.plugin.exportLayers.isSmart = undefined; //will be true on smartphones after setup
@@ -59,15 +59,15 @@ function wrapper(plugin_info) {
         if (typeof window.plugin.exportLayers.storage.exportedLayerName == "undefined") {
             window.plugin.exportLayers.storage.exportedLayerName = window.plugin.exportLayers.DEFAULT_LAYER_NAME;
         }
-		
+
         if (typeof window.plugin.exportLayers.storage.exportType == "undefined"
 				|| typeof window.plugin.exportLayers.storage.exportType.code == 'undefined'
 				|| typeof window.plugin.exportLayers.EXPORT_TYPE[window.plugin.exportLayers.storage.exportType.code] == 'undefined') {
-			window.plugin.exportLayers.storage.exportType = window.plugin.exportLayers.DEFAULT_EXPORT_TYPE;
-		}
-		else {
-			window.plugin.exportLayers.storage.exportType = window.plugin.exportLayers.EXPORT_TYPE[window.plugin.exportLayers.storage.exportType.code];//ensure instance is the same so equality works as intended
-		}
+            window.plugin.exportLayers.storage.exportType = window.plugin.exportLayers.DEFAULT_EXPORT_TYPE;
+        }
+        else {
+            window.plugin.exportLayers.storage.exportType = window.plugin.exportLayers.EXPORT_TYPE[window.plugin.exportLayers.storage.exportType.code]; //ensure instance is the same so equality works as intended
+        }
     };
 
     /***************************************************************************************************************************************************************/
@@ -76,107 +76,133 @@ function wrapper(plugin_info) {
     window.plugin.exportLayers.extractClicked = function () {
         var options = {
             exportedLayerName: window.plugin.exportLayers.storage.exportedLayerName,
-			exportType: window.plugin.exportLayers.storage.exportType
+            exportType: window.plugin.exportLayers.storage.exportType
         };
         window.plugin.exportLayers.extractAndDisplay(options);
     }
-	
-	//recursive so we add the cumulated result as a parameter
-	window.plugin.exportLayers.LeafletLayertoDrawTools = function(layerOrLayerGroup, result) {
-		if(typeof result == 'undefined') result = [];
-		
-		if(layerOrLayerGroup instanceof L.LayerGroup) {
-			var layers = layerOrLayerGroup.getLayers();
-			for(var layerIndex = 0; layerIndex < layers.length; layerIndex++){
-				var layer = layers[layerIndex];
-				window.plugin.exportLayers.LeafletLayertoDrawTools(layer,result);
-			}
-		}
-		else {
-			var layer = layerOrLayerGroup;
-			var item = {};
-			//from window.plugin.drawTools.save
-			if (layer instanceof L.GeodesicCircle || layer instanceof L.Circle) {
-				item.type = 'circle';
-				item.latLng = layer.getLatLng();
-				item.radius = layer.getRadius();
-				if(typeof layer.options.color != 'undefined')
-					item.color = layer.options.color;
-			} else if (layer instanceof L.GeodesicPolygon || layer instanceof L.Polygon) {
-				item.type = 'polygon';
-				item.latLngs = layer.getLatLngs();
-				if(typeof layer.options.color != 'undefined')
-					item.color = layer.options.color;
-			} else if (layer instanceof L.GeodesicPolyline || layer instanceof L.Polyline) {
-				item.type = 'polyline';
-				item.latLngs = layer.getLatLngs();
-				if(typeof layer.options.color != 'undefined')
-					item.color = layer.options.color;
-			} else if (layer instanceof L.Marker) {
-				item.type = 'marker';
-				item.latLng = layer.getLatLng();
-				if(typeof layer.options.icon != 'undefined' && typeof layer.options.icon.options.color != 'undefined')
-					item.color = layer.options.icon.options.color;
-			} else {
-				item = null;
-				window.plugin.exportLayers.log('Unknown layer type when exporting to draw tools layer');
-				if(layer.toGeoJSON){
-					window.plugin.exportLayers.log(JSON.stringify(layer.toGeoJSON()));
-				}
-			}
-			
-			if(item != null)
-				result.push(item);
-		}
-		
-		return result;
-	}
-	
-	//window.plugin.exportLayers.getLayerList = function
-	
-	window.plugin.exportLayers.getLayerByName = function(layerName){
-		var foundLayer = null;
-		$.each(layerChooser._layers, function (layerId, layer) {
-			if (layer.name == layerName) {
-				foundLayer = layer;
-				return false;
-			}
-		});
-		return foundLayer;
-	}
+
+    //recursive so we add the cumulated result as a parameter
+    window.plugin.exportLayers.LeafletLayertoDrawTools = function (layerOrLayerGroup, result) {
+        if (typeof result == 'undefined') result = [];
+
+        if (layerOrLayerGroup instanceof L.LayerGroup) {
+            var layers = layerOrLayerGroup.getLayers();
+            for (var layerIndex = 0; layerIndex < layers.length; layerIndex++) {
+                var layer = layers[layerIndex];
+                window.plugin.exportLayers.LeafletLayertoDrawTools(layer, result);
+            }
+        }
+        else {
+            var layer = layerOrLayerGroup;
+            var item = {};
+            //from window.plugin.drawTools.save
+            if (layer instanceof L.GeodesicCircle || layer instanceof L.Circle) {
+                item.type = 'circle';
+                item.latLng = layer.getLatLng();
+                item.radius = layer.getRadius();
+                if (typeof layer.options.color != 'undefined')
+                    item.color = layer.options.color;
+            } else if (layer instanceof L.GeodesicPolygon || layer instanceof L.Polygon) {
+                item.type = 'polygon';
+                item.latLngs = layer.getLatLngs();
+                if (typeof layer.options.color != 'undefined')
+                    item.color = layer.options.color;
+            } else if (layer instanceof L.GeodesicPolyline || layer instanceof L.Polyline) {
+                item.type = 'polyline';
+                item.latLngs = layer.getLatLngs();
+                if (typeof layer.options.color != 'undefined')
+                    item.color = layer.options.color;
+            } else if (layer instanceof L.Marker) {
+                item.type = 'marker';
+                item.latLng = layer.getLatLng();
+                if (typeof layer.options.icon != 'undefined' && typeof layer.options.icon.options.color != 'undefined')
+                    item.color = layer.options.icon.options.color;
+            } else {
+                item = null;
+                window.plugin.exportLayers.log('Unknown layer type when exporting to draw tools layer');
+                if (layer.toGeoJSON) {
+                    window.plugin.exportLayers.log(JSON.stringify(layer.toGeoJSON()));
+                }
+            }
+
+            if (item != null)
+                result.push(item);
+        }
+
+        return result;
+    }
+
+    //returns an array of { name: string, layer: L.LayerGroup }
+    window.plugin.exportLayers.getLayerList = function () {
+        var result = [];
+        //search result
+        if (window.search.lastSearch && window.search.lastSearch.selectedResult && window.search.lastSearch.selectedResult.layer) {
+            //window.search.lastSearch.selectedResult.layer is a L.LayerGroup
+            result.push({ name: "Search result", layer: window.search.lastSearch.selectedResult.layer }); //we shouldn't add the name property to search result, to avoid incompatibility, so we wrap it
+        }
+
+        //layer chooser layers
+        //        var allLayers = window.layerChooser.getLayers();
+        //        var layerArray = allLayers.overlayLayers; //window.layerChooser._layers without map layers
+        var layerChooserLayers = window.layerChooser._layers; //using internal array to remove useless loops
+        $.each(layerChooserLayers, function (layerIndex, layer) {
+            if (layer.overlay) {
+                var resultItem = {};
+                resultItem.name = layer.name; //because we had to wrap search result, we wrap layer chooser too
+                resultItem.layer = layer;
+                result.push(resultItem);
+            }
+        });
+
+        return result;
+    }
+
+    //returns one { name: string, layer: L.LayerGroup }
+    window.plugin.exportLayers.getLayerByName = function (layerName) {
+        var foundLayer = null;
+        var layers = window.plugin.exportLayers.getLayerList();
+        $.each(layers, function (layerIndex, layerObj) {
+            if (layerObj.name == layerName) {
+                foundLayer = layerObj;
+                return false;
+            }
+        });
+
+        return foundLayer;
+    }
 
     window.plugin.exportLayers.extractAndDisplay = function (options) {
         if (typeof options == 'undefined') options = {};
         if (typeof options.exportedLayerName == 'undefined') options.exportedLayerName = window.plugin.exportLayers.DEFAULT_LAYER_NAME;
-		if (typeof options.exportType == 'undefined') options.exportType = window.plugin.exportLayers.DEFAULT_EXPORT_TYPE;
+        if (typeof options.exportType == 'undefined') options.exportType = window.plugin.exportLayers.DEFAULT_EXPORT_TYPE;
 
         try {
-            window.plugin.exportLayers.log('Start of export layer:' + options.exportedLayerName+', type:'+options.exportType.name);
+            window.plugin.exportLayers.log('Start of export layer:' + options.exportedLayerName + ', type:' + options.exportType.name);
             var result = '';
 
             if (typeof options.exportedLayerName == 'string' && options.exportedLayerName != '') {
-                var layerChooserLayer = window.plugin.exportLayers.getLayerByName(options.exportedLayerName);
-                
-                if (layerChooserLayer == null) {
+                var iitcLayer = window.plugin.exportLayers.getLayerByName(options.exportedLayerName);
+
+                if (iitcLayer == null) {
                     result = "Layer not found in layer chooser";
                 }
                 else {
                     try {
-						if(options.exportType == window.plugin.exportLayers.EXPORT_TYPE.GEOGSON) {
-							result = JSON.stringify(layerChooserLayer.layer.toGeoJSON()); //the actual export
-						}
-                        else if(options.exportType == window.plugin.exportLayers.EXPORT_TYPE.DRAWTOOLS) {
-							result = window.plugin.exportLayers.LeafletLayertoDrawTools(layerChooserLayer.layer);
-							result = JSON.stringify(result);
-						}
-						else {
-							result = "Export type not implemented";
-							if(typeof options.exportType.name != 'undefined')
-								result += "("+options.exportType.name+")";
-						}
+                        if (options.exportType == window.plugin.exportLayers.EXPORT_TYPE.GEOGSON) {
+                            result = JSON.stringify(iitcLayer.layer.toGeoJSON()); //the actual export
+                        }
+                        else if (options.exportType == window.plugin.exportLayers.EXPORT_TYPE.DRAWTOOLS) {
+                            result = window.plugin.exportLayers.LeafletLayertoDrawTools(iitcLayer.layer);
+                            result = JSON.stringify(result);
+                        }
+                        else {
+                            result = "Export type not implemented";
+                            if (typeof options.exportType.name != 'undefined')
+                                result += "(" + options.exportType.name + ")";
+                        }
                     }
                     catch (err) {
-                        result = "Error: "+ err.message+'\r\n'+err.stack;
+                        result = "Error: " + err.message + '\r\n' + err.stack;
                     }
                 }
             }
@@ -202,26 +228,25 @@ function wrapper(plugin_info) {
     /*********/
     window.plugin.exportLayers.resetOpt = function () {
         window.plugin.exportLayers.storage.exportedLayerName = window.plugin.exportLayers.DEFAULT_LAYER_NAME;
-		window.plugin.exportLayers.storage.exportType = window.plugin.exportLayers.DEFAULT_EXPORT_TYPE;
-		
+        window.plugin.exportLayers.storage.exportType = window.plugin.exportLayers.DEFAULT_EXPORT_TYPE;
+
         window.plugin.exportLayers.saveStorage();
         window.plugin.exportLayers.openOptDialog();
     }
     window.plugin.exportLayers.saveOpt = function () {
         var exportedLayerName = $('#exportLayers-exportedLayerName').val();
         window.plugin.exportLayers.storage.exportedLayerName = exportedLayerName;
-		
-		var exportTypeCode = $('#exportLayers-exportType').val();
-		if(typeof window.plugin.exportLayers.EXPORT_TYPE[exportTypeCode] != 'undefined')
-		{
-			var exportType = window.plugin.exportLayers.EXPORT_TYPE[exportTypeCode];
-			window.plugin.exportLayers.storage.exportType = exportType;
-		}
-		else {
-			window.plugin.exportLayers.EXPORT_TYPE = window.plugin.exportLayers.DEFAULT_EXPORT_TYPE;
-			$('#exportLayers-exportType').val(window.plugin.exportLayers.EXPORT_TYPE.code);
-		}
-		
+
+        var exportTypeCode = $('#exportLayers-exportType').val();
+        if (typeof window.plugin.exportLayers.EXPORT_TYPE[exportTypeCode] != 'undefined') {
+            var exportType = window.plugin.exportLayers.EXPORT_TYPE[exportTypeCode];
+            window.plugin.exportLayers.storage.exportType = exportType;
+        }
+        else {
+            window.plugin.exportLayers.EXPORT_TYPE = window.plugin.exportLayers.DEFAULT_EXPORT_TYPE;
+            $('#exportLayers-exportType').val(window.plugin.exportLayers.EXPORT_TYPE.code);
+        }
+
         window.plugin.exportLayers.saveStorage();
     }
     window.plugin.exportLayers.optClicked = function () {
@@ -238,8 +263,7 @@ function wrapper(plugin_info) {
         				'</td>' +
         				'<td>' +
                             '<select id="exportLayers-exportedLayerName">';
-		var allLayers = window.layerChooser.getLayers();
-		var layerArray = allLayers.overlayLayers;//window.layerChooser._layers without map layers
+        var layerArray = window.plugin.exportLayers.getLayerList();
         for (layerIndex in layerArray) {
             var layer = layerArray[layerIndex];
             html += '<option value="' + layer.name + '" ' +
@@ -256,13 +280,13 @@ function wrapper(plugin_info) {
         				'</td>' +
         				'<td>' +
                             '<select id="exportLayers-exportType">';
-                            for(typeCode in window.plugin.exportLayers.EXPORT_TYPE){
-                                var type = window.plugin.exportLayers.EXPORT_TYPE[typeCode];
-                                html+= '<option value="'+type.code+'" '+
-                                    (window.plugin.exportLayers.storage.exportType == type ? 'selected="selected" ' : '') + 
-                                    '>' + type.name+'</option>';
-                            }
-                html += '</select>'+
+        for (typeCode in window.plugin.exportLayers.EXPORT_TYPE) {
+            var type = window.plugin.exportLayers.EXPORT_TYPE[typeCode];
+            html += '<option value="' + type.code + '" ' +
+                                    (window.plugin.exportLayers.storage.exportType == type ? 'selected="selected" ' : '') +
+                                    '>' + type.name + '</option>';
+        }
+        html += '</select>' +
         				'</td>' +
         			'</tr>';
         html +=
