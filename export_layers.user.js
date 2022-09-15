@@ -2,11 +2,11 @@
 // @id             iitc-plugin-export-layers@Jormund
 // @name           IITC plugin: export layers 
 // @category       Layer
-// @version        0.1.6.20220901.1945
+// @version        0.1.7.20220915.2302
 // @namespace      https://github.com/jonatkins/ingress-intel-total-conversion
 // @updateURL      https://raw.githubusercontent.com/Jormund/export_layers/master/export_layers.meta.js
 // @downloadURL    https://raw.githubusercontent.com/Jormund/export_layers/master/export_layers.user.js
-// @description    [2022-09-01-1945] Export layers from Layer chooser or search result
+// @description    [2022-09-15-2302] Export layers from Layer chooser or search result
 // @include        https://*.ingress.com/intel*
 // @include        https://intel.ingress.com/*
 // @match          https://intel.ingress.com/*
@@ -14,6 +14,7 @@
 // @grant          none 
 // ==/UserScript==
 //Changelog
+//0.1.7 Handle multiple polygons in search result
 //0.1.6 Really activate on intel.ingress.com
 //0.1.5	Activate on intel.ingress.com, changed download url to github
 //0.1.4 Export search result
@@ -111,13 +112,43 @@ function wrapper(plugin_info) {
             } else if (layer instanceof L.GeodesicPolygon || layer instanceof L.Polygon) {
                 item.type = 'polygon';
                 item.latLngs = layer.getLatLngs();
-                if (typeof layer.options.color != 'undefined')
+              	if (typeof layer.options.color != 'undefined')
                     item.color = layer.options.color;
+              	//handle multipolygons
+              	if(item.latLngs.length > 0 && Array.isArray(item.latLngs[0])){
+                  window.plugin.exportLayers.log('Found '+item.latLngs.length+' inner polygons');
+                  if(item.latLngs.length>1) {
+                    for(var innerArrayIndex=1;innerArrayIndex<item.latLngs.length;innerArrayIndex++){
+                      var item2 = {};
+                      item2.type=item.type;
+                      item2.color=item.color;
+                      item2.latLngs=item.latLngs[innerArrayIndex];
+                      result.push(item2);
+                    }
+                  }
+                  item.latLngs=item.latLngs[0];
+                }
+              
+                
             } else if (layer instanceof L.GeodesicPolyline || layer instanceof L.Polyline) {
                 item.type = 'polyline';
                 item.latLngs = layer.getLatLngs();
                 if (typeof layer.options.color != 'undefined')
                     item.color = layer.options.color;
+              	//handle multipolylines
+              	if(item.latLngs.length > 0 && Array.isArray(item.latLngs[0])){
+                  window.plugin.exportLayers.log('Found '+item.latLngs.length+' inner polylines');
+                  if(item.latLngs.length>1) {
+                    for(var innerArrayIndex=1;innerArrayIndex<item.latLngs.length;innerArrayIndex++){
+                      var item2 = {};
+                      item2.type=item.type;
+                      item2.color=item.color;
+                      item2.latLngs=item.latLngs[innerArrayIndex];
+                      result.push(item2);
+                    }
+                  }
+                  item.latLngs=item.latLngs[0];
+                }
             } else if (layer instanceof L.Marker) {
                 item.type = 'marker';
                 item.latLng = layer.getLatLng();
