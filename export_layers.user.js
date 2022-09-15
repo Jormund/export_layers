@@ -2,11 +2,11 @@
 // @id             iitc-plugin-export-layers@Jormund
 // @name           IITC plugin: export layers 
 // @category       Layer
-// @version        0.1.7.20220915.2302
+// @version        0.1.8.20220915.2335
 // @namespace      https://github.com/jonatkins/ingress-intel-total-conversion
 // @updateURL      https://raw.githubusercontent.com/Jormund/export_layers/master/export_layers.meta.js
 // @downloadURL    https://raw.githubusercontent.com/Jormund/export_layers/master/export_layers.user.js
-// @description    [2022-09-15-2302] Export layers from Layer chooser or search result
+// @description    [2022-09-15-2335] Export layers from Layer chooser or search result
 // @include        https://*.ingress.com/intel*
 // @include        https://intel.ingress.com/*
 // @match          https://intel.ingress.com/*
@@ -14,6 +14,7 @@
 // @grant          none 
 // ==/UserScript==
 //Changelog
+//0.1.8 Handle deep arrays of multi-polygons
 //0.1.7 Handle multiple polygons in search result
 //0.1.6 Really activate on intel.ingress.com
 //0.1.5	Activate on intel.ingress.com, changed download url to github
@@ -88,7 +89,28 @@ function wrapper(plugin_info) {
         window.plugin.exportLayers.extractAndDisplay(options);
     }
 
-    //recursive so we add the cumulated result as a parameter
+    //handle unknown depth of arrays for multi-polygons or polyline
+	window.plugin.exportLayers.MultiPolyToDrawToolItems = function (polyLatLngs,result,options) {
+		if(polyLatLngs.length > 0 && Array.isArray(polyLatLngs[0])) {
+			//recursive call of inner array
+			for(var innerArrayIndex=0;innerArrayIndex<polyLatLngs.length;innerArrayIndex++){
+				window.plugin.exportLayers.MultiPolyToDrawToolItems(polyLatLngs[innerArrayIndex],result,options);
+			}
+		}
+		else if(Array.isArray(polyLatLngs)) {
+			//current value is an array
+			var item = {};
+			item.type = options.type;
+			if(typeof options.color != 'undefined') item.color=options.color;
+			item.latLngs = polyLatLngs;
+			result.push(item);
+		}
+		else {
+			//this should never happen
+			window.plugin.exportLayers.log('Failed to find data of multi'+options.type);
+		}
+	}
+	//recursive so we add the cumulated result as a parameter
     window.plugin.exportLayers.LeafletLayertoDrawTools = function (layerOrLayerGroup, result) {
         if (typeof result == 'undefined') result = [];
 
@@ -109,51 +131,29 @@ function wrapper(plugin_info) {
                 item.radius = layer.getRadius();
                 if (typeof layer.options.color != 'undefined')
                     item.color = layer.options.color;
+				result.push(item);
             } else if (layer instanceof L.GeodesicPolygon || layer instanceof L.Polygon) {
-                item.type = 'polygon';
+                var options = {};
+				options.type = 'polygon';
                 item.latLngs = layer.getLatLngs();
               	if (typeof layer.options.color != 'undefined')
-                    item.color = layer.options.color;
+                    options.color = layer.options.color;
               	//handle multipolygons
-              	if(item.latLngs.length > 0 && Array.isArray(item.latLngs[0])){
-                  window.plugin.exportLayers.log('Found '+item.latLngs.length+' inner polygons');
-                  if(item.latLngs.length>1) {
-                    for(var innerArrayIndex=1;innerArrayIndex<item.latLngs.length;innerArrayIndex++){
-                      var item2 = {};
-                      item2.type=item.type;
-                      item2.color=item.color;
-                      item2.latLngs=item.latLngs[innerArrayIndex];
-                      result.push(item2);
-                    }
-                  }
-                  item.latLngs=item.latLngs[0];
-                }
-              
-                
+              	window.plugin.exportLayers.MultiPolyToDrawToolItems(item.latLngs,result,options);
             } else if (layer instanceof L.GeodesicPolyline || layer instanceof L.Polyline) {
-                item.type = 'polyline';
+                var options = {};
+				options.type = 'polyline';
                 item.latLngs = layer.getLatLngs();
                 if (typeof layer.options.color != 'undefined')
-                    item.color = layer.options.color;
+                    options.color = layer.options.color;
               	//handle multipolylines
-              	if(item.latLngs.length > 0 && Array.isArray(item.latLngs[0])){
-                  window.plugin.exportLayers.log('Found '+item.latLngs.length+' inner polylines');
-                  if(item.latLngs.length>1) {
-                    for(var innerArrayIndex=1;innerArrayIndex<item.latLngs.length;innerArrayIndex++){
-                      var item2 = {};
-                      item2.type=item.type;
-                      item2.color=item.color;
-                      item2.latLngs=item.latLngs[innerArrayIndex];
-                      result.push(item2);
-                    }
-                  }
-                  item.latLngs=item.latLngs[0];
-                }
+              	window.plugin.exportLayers.MultiPolyToDrawToolItems(item.latLngs,result,options);
             } else if (layer instanceof L.Marker) {
                 item.type = 'marker';
                 item.latLng = layer.getLatLng();
                 if (typeof layer.options.icon != 'undefined' && typeof layer.options.icon.options.color != 'undefined')
                     item.color = layer.options.icon.options.color;
+				result.push(item);
             } else {
                 item = null;
                 window.plugin.exportLayers.log('Unknown layer type when exporting to draw tools layer');
@@ -161,9 +161,6 @@ function wrapper(plugin_info) {
                     window.plugin.exportLayers.log(JSON.stringify(layer.toGeoJSON()));
                 }
             }
-
-            if (item != null)
-                result.push(item);
         }
 
         return result;
